@@ -1,0 +1,11 @@
+{
+  "name": "claude-lean-team",
+  "owner": { "name": "melkamsar" },
+  "plugins": [
+    {
+      "name": "lean-team",
+      "source": "./",
+      "description": "Skill /lean-team + agents lean-worker (haiku) and lean-builder (sonnet) for token-economical work with subagents."
+    }
+  ]
+}
