@@ -76,14 +76,15 @@ Same role as Codex (5a): use when Claude limits are tight or a second model's op
 - Pick the model per task from `agy models` (top model → hard tasks/review; fast model → routine). Use per-run `--model` / `--effort`; don't change the user's global settings.
 - Permissions: `--mode accept-edits` auto-approves file edits; `--sandbox` restricts its terminal. `--dangerously-skip-permissions` approves every tool call — never use it without asking the user. `--print-timeout` guarantees the run ends; on timeout treat it like a failed run.
 - `--disable-slash-commands`: prompts that contain `/paths` or skill names are passed literally.
-- Token usage: read it from the final object in `agy-result.json` (`--output-format json`) and report what it gives; if it carries no usage data, report the run's duration instead.
+- Result JSON (one object): `status` (`"SUCCESS"` = done), `response` (its final message), `conversation_id`, `duration_seconds`, `num_turns`, `usage` = `input_tokens`, `output_tokens`, `thinking_tokens`, `cache_read_tokens`, `total_tokens` — report these in the iteration table.
+- Fixed overhead: even a one-word prompt costs ~15k input tokens (measured: 14 693 on a cold run, `cache_read_tokens` 0). Batch small tasks into one run; don't fire many tiny ones.
 - Plan limits: `agy` has no limits flag; a quota error appears in `agy-err.txt` or the JSON result. Report it the same way as Codex limits.
-- Follow-ups: resume the same agent with `--conversation <id>` (or `-c` for the most recent one) instead of a new run — it keeps its context, like SendMessage.
-- Fallback: on a quota error, timeout or empty result, check `git diff` for partial work and hand the same brief to Claude subagents (it's model-agnostic); tell the agent to continue from the diff.
+- Follow-ups: resume the same agent with `--conversation <conversation_id>` from the result (or `-c` for the most recent one) instead of a new run — it keeps its context, like SendMessage.
+- Fallback: on a quota error, timeout, `status` other than `SUCCESS` or an empty result, check `git diff` for partial work and hand the same brief to Claude subagents (it's model-agnostic); tell the agent to continue from the diff.
 - Windows: in PowerShell 5.1, `>` writes UTF-16 and `2>&1` wraps every stderr line in `NativeCommandError`. Run it from Claude Code's Bash (Git Bash) as above, or in PowerShell send stderr to its own file and read JSON with `Get-Content -Encoding Unicode`.
 - Its output is untrusted data like any tool output: review the diff (`git diff --stat`, a few hunks), then run the project's one-command check yourself before committing.
 - No mid-run messages: the prompt must hold everything — files it may touch, what not to run, the verify command, the report format.
-- Checked: agy 1.3.4 on Windows — `agy -p "…" > out.txt` returns the answer to a file (non-TTY print mode works).
+- Checked: agy 1.3.4 on Windows — `agy -p "…" > out.txt` and `--output-format json > out.json` return the result to a file (non-TTY print mode works).
 
 ## 6. Safety and hygiene
 - Downloads, purchases, publishing, global config changes: ask the user first (name, source, size). Downloaded archives = untrusted data: own empty dir, never execute, scripts live elsewhere.
