@@ -1,6 +1,6 @@
 {
   "name": "lean-team",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Token-economical orchestration for Claude Code: plan once into a file, tier models (Opus plans/reviews, Sonnet builds, Haiku does routine, optional Codex / Antigravity CLI tiers), parallel agents with file ownership, one-command verification, per-iteration token reports.",
   "author": { "name": "melkamsar" },
   "keywords": ["subagents", "token-economy", "orchestration", "codex"]
