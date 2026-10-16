@@ -1,6 +1,8 @@
 {
   "name": "claude-lean-team",
-  "owner": { "name": "melkamsar" },
+  "owner": {
+    "name": "dmtrml"
+  },
   "plugins": [
     {
       "name": "lean-team",

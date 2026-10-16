@@ -14,15 +14,14 @@
 ### Вариант А — плагином прямо из GitHub (удобно обновлять)
 В Claude Code:
 ```
-/plugin marketplace add melkamsar/claude-lean-team
+/plugin marketplace add dmtrml/claude-lean-team
 /plugin install lean-team@claude-lean-team
 ```
-Репозиторий приватный — на машине должен быть выполнен вход в GitHub (`gh auth login` или git-учётные данные). Обновление: `/plugin marketplace update claude-lean-team`.
 При установке плагином агенты могут называться с префиксом: `lean-team:lean-worker`, `lean-team:lean-builder`.
 
 ### Вариант Б — скопировать файлы скриптом
 ```bash
-git clone https://github.com/melkamsar/claude-lean-team.git
+git clone https://github.com/dmtrml/claude-lean-team.git
 cd claude-lean-team
 ./install.sh                      # для всех проектов (~/.claude)
 ./install.sh /path/to/project     # только для одного проекта (<проект>/.claude)
