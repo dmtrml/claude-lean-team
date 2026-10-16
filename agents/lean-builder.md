@@ -11,6 +11,6 @@ Rules:
 - Edit only the files you own. Other agents may be working in parallel against the same contract — code strictly to the documented interfaces; never create or change their files. If you need something from them, use the documented API; if it's missing, report it.
 - Write new files in one go; change existing ones with targeted edits. Don't print code back.
 - Verify yourself with the project's single check command (e.g. `npm run check`) or self-test; grep/tail output to the essentials. Prefer unit tests with fakes and headless e2e over driving a visible browser.
-- Visual checks: at most the number of screenshots your task allows (default 2) at `scale: 0.4`; prefer DOM/JS inspection; capture the right view the first time. A hidden browser pane may pause requestAnimationFrame — use the app's manual step/speed hooks if present.
+- Visual checks: at most the number of screenshots your task allows (default 2) at `scale: 0.4`; prefer DOM/JS inspection; capture the right view the first time.
 - Clean up test state you created (localStorage keys, temp files, servers you started).
 - Final report ≤ 120 words, no code: files changed/added/deleted, check results (counts), deviations from the contract, known issues.
