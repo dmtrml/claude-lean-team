@@ -1,45 +1,59 @@
-# lean-team — экономная работа с субагентами в Claude Code
+# lean-team — token-economical teamwork for Claude Code
 
-Навык (skill) и два профиля субагентов, которые превращают Claude Code в «команду»: дорогая модель планирует и проверяет, дешёвые делают объём работы. Опционально подключаются **Codex CLI** и **Antigravity CLI** как ещё один уровень (работа идёт на лимитах ChatGPT или Google AI, а не Claude).
+[Русская версия](README.ru.md)
 
-**Что внутри**
-| Файл | Что это |
+A skill and two subagent profiles that turn Claude Code into a team: the expensive main model plans, decides and reviews; cheaper executors do the volume. Work goes to **external CLI executors first** (Codex CLI, Antigravity CLI, or any CLI you write an adapter for), so it runs on your other AI plans, and falls back to Claude's own Sonnet and Haiku tiers when their limits run out. A built-in learning loop turns repeated, measured experience into rules — one lucky run never becomes a rule.
+
+## What's inside
+
+| Path | What it is |
 |---|---|
-| `skills/lean-team/SKILL.md` | Порядок работы: план в файл, распределение моделей (Opus → Sonnet → Haiku, опционально Codex / Antigravity), параллельные агенты с владением файлами, проверка одной командой, жёсткие лимиты, отчёт о расходе токенов и лимитов, анти-паттерны из практики |
-| `agents/lean-worker.md` | Дешёвый исполнитель на **Haiku**: поиск, скачивания, контент, настройка, механика |
-| `agents/lean-builder.md` | Строитель на **Sonnet**: пишет код и сам проверяет его одной командой |
+| `skills/lean-team/SKILL.md` | **Universal core** (loaded on every use, kept short): brief once into a file, roles and delegation order, parallel agents with file ownership, one-command verification, hard limits, plan-limit budgeting, per-iteration reports, the learning loop |
+| `skills/lean-team/adapters/` | One file per external executor, read only when that executor is used: `codex.md`, `antigravity.md`, and `TEMPLATE.md` for adding your own (DeepSeek, Gemini CLI, Aider, …) |
+| `skills/lean-team/recipes/` | Stack and platform specifics, read only when they apply: `web-js.md`, `windows.md` |
+| `skills/lean-team/templates/` | Retro questions, candidate-rule format, metrics line format |
+| `agents/lean-builder.md`, `agents/lean-worker.md` | Claude fallback tiers: builder on **Sonnet** (writes and self-verifies code), worker on **Haiku** (research, downloads, content, config, mechanical moves) |
+| `docs/evidence.md` | Measurements behind the rules and the open candidate rules |
 
-## Установка
+## Install
 
-### Вариант А — плагином прямо из GitHub (удобно обновлять)
-В Claude Code:
+### Option A — as a plugin straight from GitHub (easy updates)
+In Claude Code:
 ```
 /plugin marketplace add dmtrml/claude-lean-team
 /plugin install lean-team@claude-lean-team
 ```
-При установке плагином агенты могут называться с префиксом: `lean-team:lean-worker`, `lean-team:lean-builder`.
+Installed as a plugin, the agents may be namespaced: `lean-team:lean-worker`, `lean-team:lean-builder`.
 
-### Вариант Б — скопировать файлы скриптом
+### Option B — copy the files with a script
 ```bash
 git clone https://github.com/dmtrml/claude-lean-team.git
 cd claude-lean-team
-./install.sh                      # для всех проектов (~/.claude)
-./install.sh /path/to/project     # только для одного проекта (<проект>/.claude)
+./install.sh                      # for all projects (~/.claude)
+./install.sh /path/to/project     # for one project (<project>/.claude)
 ```
 Windows PowerShell:
 ```powershell
-.\install.ps1                              # для всех проектов
-.\install.ps1 -Project C:\path\to\project  # только для одного проекта
+.\install.ps1                              # for all projects
+.\install.ps1 -Project C:\path\to\project  # for one project
 ```
-Вариант «для проекта» удобно закоммитить в репозиторий проекта — тогда навык будет у всех, кто работает с ним.
+The per-project variant can be committed to the project repository so the whole team gets it. Start a **new** Claude Code session after installing.
 
-После установки начните **новую сессию** Claude Code.
+## Use
+Write your task and add `/lean-team`, or just say "save tokens". Until the skill is invoked it costs almost nothing (only its one-line description is in context).
 
-## Использование
-Напишите задачу и добавьте `/lean-team` — или просто «экономь токены». Пока навык не вызван, он не тратит токены (в контексте только строка описания).
+External executors are optional. Without any adapter installed and logged in, everything runs on Claude tiers. To use Codex CLI or Antigravity CLI, install and log in to them; the adapters describe headless runs, permissions, token and limit reading, follow-ups and fallback.
 
-## Codex CLI (необязательно)
-Нужен установленный и залогиненный Codex CLI (`codex login`). Навык описывает запуск `codex exec` в фоне, выбор модели под задачу, чтение расхода и лимитов из журналов Codex, переход на субагентов Claude при исчерпании лимита и обходы для песочницы Windows.
+## Layers: shared core vs. your own experience
+- **Core** (this repository): universal rules. It is never changed automatically; changes come as pull requests with evidence.
+- **Personal layer** `~/.claude/lean-team/local.md` and **project layer** `<project>/.claude/lean-team.md`: rules the agent learned for you and your project, maintained by the agent, kept outside the plugin folder (plugin updates overwrite it), never committed here.
+- **Records** `~/.claude/lean-team/metrics.jsonl` and `candidates.md`: one metrics line per iteration and the candidate rules under test.
 
-## Antigravity CLI (необязательно)
-Нужен установленный Antigravity CLI (`agy`) с выполненным входом. Навык описывает запуск `agy -p` в фоне с JSON-выводом, выбор модели (`agy models`) и уровня рассуждений, права (`--mode accept-edits` и список разрешённых проверочных команд в `~/.gemini/antigravity-cli/settings.json`; `--sandbox` в режиме без диалога запрещает терминал целиком; полный доступ — только с разрешения пользователя), тайм-аут, продолжение разговора (`--conversation`), переход на субагентов Claude при исчерпании лимита и особенности PowerShell. Проверено на agy 1.3.4 (Windows).
+## How the skill improves
+After each iteration the agent logs tokens per executor, review rounds and the cause of every redo, answers three retro questions and records candidate rules. A candidate becomes a rule only after it was applied at least 3 times on 2 different tasks and moved its metric the expected way in at least 2 of 3 comparable cases without hurting quality. A rule is proposed to the core only after it held in 2 projects. Rules without a measurable effect are retired; the layers have size caps because every line is paid on every load. Details: `SKILL.md` §8.
+
+## Contributing
+Pull requests are welcome, especially new adapters (from `adapters/TEMPLATE.md`, filled from a tiny trial run) and evidence. A rule change needs an evidence table: where it was applied, the metric before and after, and whether quality held.
+
+## License
+MIT — see `LICENSE`.

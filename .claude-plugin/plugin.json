@@ -1,7 +1,7 @@
 {
   "name": "lean-team",
-  "version": "1.2.0",
-  "description": "Token-economical orchestration for Claude Code: plan once into a file, tier models (Opus plans/reviews, Sonnet builds, Haiku does routine, optional Codex / Antigravity CLI tiers), parallel agents with file ownership, one-command verification, per-iteration token reports.",
+  "version": "2.0.0",
+  "description": "Token-economical orchestration for Claude Code: plan once into a file, delegate to external CLI executors first (Codex, Antigravity or your own adapter) with fallback to Claude tiers, parallel agents with file ownership, one-command verification, per-iteration token reports and a learning loop that promotes rules only on repeated evidence.",
   "author": {
     "name": "dmtrml"
   },
@@ -9,7 +9,9 @@
     "subagents",
     "token-economy",
     "orchestration",
-    "codex"
+    "codex",
+    "antigravity",
+    "adapters"
   ],
   "license": "MIT",
   "repository": "https://github.com/dmtrml/claude-lean-team"

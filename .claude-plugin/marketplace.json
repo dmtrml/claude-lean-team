@@ -7,7 +7,7 @@
     {
       "name": "lean-team",
       "source": "./",
-      "description": "Skill /lean-team + agents lean-worker (haiku) and lean-builder (sonnet) for token-economical work with subagents."
+      "description": "Token-economical orchestration for Claude Code: plan once into a file, delegate to external CLI executors first (Codex, Antigravity or your own adapter) with fallback to Claude tiers, parallel agents with file ownership, one-command verification, per-iteration token reports and a learning loop that promotes rules only on repeated evidence."
     }
   ]
 }
