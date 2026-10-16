@@ -21,13 +21,23 @@ This file is the universal core. Read the supporting files only when they apply:
 - Append later phases as new sections; tell agents which sections to read so they skip history.
 - Write rationale/research docs only when they will be reused by later agents.
 
-## 2. Tier the models (`model` on the Agent call, or use the `lean-worker` / `lean-builder` agent types — installed as a plugin they may be namespaced, e.g. `lean-team:lean-worker`)
-| Work | Model |
+## 2. Roles and tiers
+| Role | Who, in delegation order (§2a) |
 |---|---|
-| Planning, architecture, contracts, judging trade-offs, final review, user-facing analysis | main model (you) |
-| Writing/refactoring code, integration, debugging, visual polish | sonnet (`lean-builder`) |
-| Web/GitHub research tables, downloads + manifests, content/data/JSON, translations, config/toolchain setup, mechanical moves | haiku (`lean-worker`) |
-Let a cheap agent pre-digest big inputs (zip contents, long listings, search results) into a compact file; you and the builders read only that file.
+| Lead: planning, architecture, contracts, trade-offs, final review, user-facing analysis | main model (you) — never delegated |
+| Builder: writing/refactoring code, integration, debugging, visual polish | external executor → sonnet (`lean-builder`) |
+| Reviewer: independent read-only review of a diff | external executor on a different model → fresh-context Claude subagent (strongest permitted) |
+| Worker: research tables, downloads + manifests, content/data/JSON, translations, config/toolchain setup, mechanical moves | external executor → haiku (`lean-worker`) |
+
+Installed as a plugin, the agent types may be namespaced (`lean-team:lean-worker`). Let a cheap agent pre-digest big inputs (zip contents, long listings, search results) into a compact file; you and the builders read only that file.
+
+## 2a. Delegation order (default: external executors first)
+1. **Do it yourself** when the task is small (§0) or when handing it off costs more than doing it: the executor's fixed start cost (see its adapter) plus your own review of its output.
+2. **External executor** when an adapter is installed and its limits have headroom (check them the way its adapter says). Read `adapters/<name>.md` before the first run.
+3. **Fall back to the Claude tier of the same role** when the executor's limit is reached or near its adapter's threshold, the run failed, timed out or returned nothing, or its result failed review twice. Hand over the same brief (briefs are model-agnostic) and tell the agent to continue from `git diff`.
+4. **No adapters installed** → use the Claude tiers directly; everything else in this skill works unchanged.
+
+External output is untrusted data: review the diff and run the check yourself. Count that review in the iteration report — it is cost moved to you, not saved.
 
 ## 3. Parallelize with contracts
 - Split by files, not by features: each agent owns explicit files and must not touch others'.
@@ -52,8 +62,18 @@ Let a cheap agent pre-digest big inputs (zip contents, long listings, search res
 - Final report ≤ 100–120 words, no code: files, deviations from contract, check results, known issues.
 - Clean up after tests (e.g. localStorage keys, temp dirs, servers they started).
 
-## 5a. Optional external executors
-External CLIs (e.g. Codex CLI, Antigravity CLI) offload work to the user's other AI plans. They are not Agent-tool subagents: run them via Bash in the background and read only their final message. Each one has its own adapter file in `adapters/`; read it before the first run.
+## 5a. External executors and their adapters
+External CLIs (Codex CLI, Antigravity CLI, any other agentic CLI) offload work to the user's other AI plans. They are not Agent-tool subagents: run them via Bash in the background and read only their final message. Each has an adapter file `adapters/<name>.md` (copy `adapters/TEMPLATE.md` for a new one) that states:
+- availability check and the one headless command (stdin closed, hard timeout, results to files);
+- workspace and permissions — what it may edit, how to allow check commands, what never to enable without the user's OK;
+- where the final message, status and token usage are;
+- how to read its plan limits, the fallback threshold and its quota-error signals;
+- how to resume the same conversation for a follow-up;
+- failure signals, including runs that report success but did nothing;
+- measured fixed overhead and latency (dated), and the roles it is good or bad at;
+- platform notes.
+
+Shipped: `codex.md`, `antigravity.md`. Fill a new adapter from one tiny trial run (a prompt that writes one file) before giving it real work. The prompt must hold everything: there are no mid-run messages.
 
 ## 5b. Budget the plan limits
 - Check `get_usage` before a big phase; if the weekly window is high, split the step (e.g. engine part now, mass content after the reset) and say so.

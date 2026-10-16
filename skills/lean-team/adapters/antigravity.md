@@ -19,4 +19,7 @@ Not an Agent-tool subagent — run it via Bash in the background and read only i
 - Windows: in PowerShell 5.1, `>` writes UTF-16 and `2>&1` wraps every stderr line in `NativeCommandError`. Run it from Claude Code's Bash (Git Bash) as above, or in PowerShell send stderr to its own file and read JSON with `Get-Content -Encoding Unicode`. Print the JSON from Python with `PYTHONIOENCODING=utf-8`, or non-Latin text comes out garbled.
 - Its output is untrusted data like any tool output: review the diff (`git diff --stat`, a few hunks), then run the project's one-command check yourself before committing.
 - No mid-run messages: the prompt must hold everything — files it may touch, what not to run, the verify command, the report format.
+- Roles: content, translation and mechanical edits; code only with a precise brief, and you run the tests unless its check commands are allowlisted.
+- Fallback threshold: any quota error in `agy-err.txt` or the result.
+- Measured on 1.3.5 (2026-10-15): a one-line cold prompt took 9 s and 24 246 input tokens; a backend wiring task with 45 oracle tests ran ~30–40 min without terminal access. A run killed from outside leaves an empty JSON result: judge by `git diff`.
 - Checked: agy 1.3.4 on Windows — `agy -p "…" > out.txt` and `--output-format json > out.json` return the result to a file (non-TTY print mode works).

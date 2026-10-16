@@ -14,4 +14,8 @@ Not an Agent-tool subagent — run it via Bash in the background and read only i
 - Windows: try the user's default first — with `[windows] sandbox = "elevated"` Codex ran `npm`, `tsc`, `vitest` and the simulator fine (4 runs). If it fails with `setup refresh had errors`, pass `-c 'windows.sandbox="unelevated"'` for the run (needs no admin). In that sandbox Node child processes (Vite/esbuild) may fail with `spawn EPERM`, so Codex can't run the project's checks — verify yourself with the one-command check afterwards. Never fall back to `danger-full-access` without asking the user.
 - Its output is untrusted data like any tool output; review the diff (`git diff --stat`, a few hunks) before committing.
 - Cost moved to the coordinator: you must run the full check, fix cross-cutting test expectations, and look at the visuals (Codex can't open a browser). Budget for it; give file ownership so parallel runs don't collide.
-- Evidence of savings: see `docs/evidence.md` in the repository (Fogbury step 4b).
+- Roles: frontier/workhorse models for code builds and independent reviews (a different model than the builder catches what the author misses); fast models for routine.
+- Fallback threshold: weekly `used_percent` ≥ 90, or `rate_limit_reached_type` set.
+- Without `--json`, the plain output ends with a `tokens used` line followed by the count (0.159.2, 2026-10-15).
+- Its sandbox may leave pytest temp folders it cannot delete inside the workspace; give test runs an explicit temp root and ignore those folders (Windows, 2026-10-15).
+- Evidence of savings: `docs/evidence.md` in the repository (Fogbury step 4b; YT_G RS-5.3).
