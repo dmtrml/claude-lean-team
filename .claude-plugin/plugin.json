@@ -1,7 +1,7 @@
 {
   "name": "lean-team",
-  "version": "2.1.0",
-  "description": "Token-economical orchestration for Claude Code: plan once into a file, delegate to external CLI executors first (Codex, Antigravity or your own adapter) with fallback to Claude tiers, parallel agents with file ownership, one-command verification, per-iteration token reports and a learning loop that promotes rules only on repeated evidence.",
+  "version": "2.2.0",
+  "description": "Token-economical orchestration for Claude Code: plan once into a file, delegate to external CLI executors first (Codex, Antigravity or your own adapter) with fallback to Claude tiers, parallel agents with file ownership, one-command verification, per-iteration token reports from the session log and a learning loop that turns itself on, counts its own thresholds and promotes rules only on repeated evidence.",
   "author": {
     "name": "dmtrml"
   },

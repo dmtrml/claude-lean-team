@@ -6,6 +6,15 @@ Rules written before version 2.0 are kept as they were (grandfathered) and are r
 
 ## Cases
 
+### The learning loop itself (audit of 2.1.0, 2026-10-25) → version 2.2
+- **Data:** 52 metric lines (2026-10-16…24) from 4 projects (video production 38, web backend 9, web game 4, document check 1), 58 candidates, 2 project layers, 45 session logs that mention the skill.
+- **Who turned the skill on:** the user's `/lean-team` in 11 sessions, a parent session's brief ("first load /lean-team") in ~25, the model on its own in 3. In 6 more the user asked to save tokens and the skill was never loaded.
+- **Consolidation:** 0 runs in 52 iterations (the core asked for one every ~5). The personal layer was never created; one project layer grew to 66 lines (cap 40) and held measurements, not rules. Duplicate candidate ids appeared.
+- **Promotion:** 2 of 58 candidates in 9 days, although several were applied 3–5 times — thresholds could not be counted: metric lines used 89 different fields (`tool_calls` / `tool_calls_approx` / `tool_uses`), 8 had no skill version.
+- **Cost drift:** the candidates file reached 29 KB (≈ 8–9k tokens when read whole).
+- **Session-log detail for token counts:** one model call is written once per content block with the same `usage` (up to 7 lines per call); counting lines instead of `message.id` roughly doubles the total.
+- **2.2 response:** hooks that remind at session start and on "save tokens" prompts; `lt.sh tokens` (deduplicated counts from the session log); `lt.sh log` (one schema, validated ids); `lt.sh status` (thresholds, retire list, consolidation due, size caps); strict candidate format. Expected: the skill is loaded in most multi-step sessions without the user typing it, and consolidation runs every ~5 iterations. To be re-measured on the next 10 iterations.
+
 ### YT_G (FastAPI/SQLite backend, Windows + WSL, 2026-10-15), step RS-5.3 review fixes
 - **Executors:** Codex `gpt-6.1-sol` as builder (2 runs, ~216k tokens) and as independent read-only reviewer (5 runs, ~385k tokens); Antigravity Gemini 3.8 Flash High as builder for the next step (~30–40 min, no terminal access). Claude did planning, briefs, diff review and the Windows/WSL gates.
 - **Four review rounds instead of 1–2:** ~40 % of the Codex tokens of the step went to rounds 2–4. Causes: `brief-ambiguous` (invariants listed as example encodings instead of a principle), `design-not-decided` (the builder chose a global logging patch), `ownership-too-narrow` (the error-code fix needed a file outside the allowed list), `brief-contradictory` ("keep all round-1 tests" while replacing that design), `scope-grew-in-review` (new leak channels each round), `lead-error` (one gap in the lead's own fix).
