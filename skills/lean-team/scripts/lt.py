@@ -13,7 +13,7 @@ import subprocess
 import sys
 
 
-VERSION = "2.2.0"
+VERSION = "2.2.1"
 MAX_TRANSCRIPT = 50 * 1024 * 1024
 KINDS = ("build", "fix", "review", "research", "content", "media", "plan", "ops")
 CAUSES = ("brief-ambiguous", "design-not-decided", "ownership-too-narrow",
@@ -29,6 +29,7 @@ HEADING_RE = re.compile(
     r"^## (" + ID_PATTERN + r") · (mechanical|large|small) · "
     r"(candidate|trial|rule|proposed-to-core|retired) · "
     r"(core|personal|project:\S+|adapter:\S+|recipe:\S+)\s*$")
+SHARED_SCOPES = ("adapter:", "recipe:")
 EVIDENCE_RE = re.compile(r"^- (\d{4}-\d{2}-\d{2}) (\S+) v([\d.]+): (.*)$")
 FIELDS = ("calls", "input", "write_5m", "write_1h", "read", "output", "effective")
 
@@ -341,21 +342,28 @@ def line_count(path):
     return len(read_text(path).splitlines())
 
 
+def open_candidates(candidates, project):
+    # Adapter and recipe candidates belong to no project, so every project sees them, last.
+    visible = [candidate for candidate in candidates
+               if candidate["status"] in ("candidate", "trial")
+               and (candidate["scope"] in ("core", "personal", "project:" + project)
+                    or candidate["scope"].startswith(SHARED_SCOPES))]
+    return sorted(visible, key=lambda candidate: candidate["scope"].startswith(SHARED_SCOPES))
+
+
 def status_data(args, hook=None):
     directory = project_dir(args, hook)
     project = getattr(args, "project", None) or directory.name
     candidates, unformatted = candidate_data()
     count = iterations()
-    open_candidates = [candidate for candidate in candidates
-                       if candidate["status"] in ("candidate", "trial")
-                       and candidate["scope"] in ("core", "personal", "project:" + project)]
     caps = {}
     for name, path, cap in (("personal", data_dir() / "local.md", 60),
                             ("project", directory / ".claude/lean-team.md", 40)):
         lines = line_count(path)
         caps[name] = dict(lines=lines, cap=cap, over=lines > cap)
     return dict(project=project, iterations_since_consolidation=count, due=count >= 5,
-                strict=len(candidates), unformatted=unformatted, open=len(open_candidates),
+                strict=len(candidates), unformatted=unformatted,
+                open=len(open_candidates(candidates, project)),
                 candidates=candidates, ready=[c["id"] for c in candidates if c["ready"]],
                 retire=[c["id"] for c in candidates if c["retire"]],
                 check=[c["id"] for c in candidates if c["check"]], caps=caps)
@@ -385,12 +393,10 @@ def status_command(args):
     if args.json:
         print(json.dumps(status, ensure_ascii=False))
     elif args.open:
-        candidates = [c for c in status["candidates"]
-                      if c["status"] in ("candidate", "trial")
-                      and c["scope"] in ("core", "personal", "project:" + status["project"])]
-        for c in candidates[:20]:
-            print("{} · {} · {} · {}/{} · {}".format(
-                c["id"], c["type"], c["status"], c["yes"], c["total"], c["action"][:90]))
+        for c in open_candidates(status["candidates"], status["project"]):
+            tag = "[{}] ".format(c["scope"]) if c["scope"].startswith(SHARED_SCOPES) else ""
+            print("{} · {} · {} · {}/{} · {}{}".format(
+                c["id"], c["type"], c["status"], c["yes"], c["total"], tag, c["action"][:90]))
     else:
         print("\n".join(status_lines(status)))
 
