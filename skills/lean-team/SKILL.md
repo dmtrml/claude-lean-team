@@ -14,7 +14,7 @@ This file is the universal core. Read the supporting files only when they apply:
 
 ## 0. Before spawning anything
 - Read your learned layers first, if they exist: `~/.claude/lean-team/local.md` (this user and machine) and `<project>/.claude/lean-team.md` (this project). They are short; the narrower layer wins over the core (§8).
-- Then run `bash <this skill's dir>/scripts/lt.sh status` (the session-start reminder prints its path). If it says `consolidate now`, consolidate (§8) before the task. `status --open` lists this project's open candidates — read that, not the whole file.
+- Then run `bash <this skill's dir>/scripts/lt.sh status` (the session-start reminder prints its path). If it says `consolidate now`, consolidate (§8) before the task. `status --open` lists this project's open candidates, adapter/recipe ones last — read that, not the whole file.
 - Answer from context if you can. Don't re-read files already in context.
 - Small, local fixes (a few edits in code you've already seen): do them yourself. A fresh agent costs ~50–150k tokens just to orient.
 - Decide the split once, then act. Tell the user the plan in 1–2 lines, not a survey.

@@ -283,7 +283,7 @@ class ContractTests(unittest.TestCase):
         before = sorted(str(path) for path in self.root.rglob("*"))
         row = json.loads(self.ok(*self.log_args("--dry-run")))
         self.assertEqual(list(row), METRIC_KEYS)
-        self.assertEqual(row["skill_version"], "2.2.0")
+        self.assertEqual(row["skill_version"], "2.2.1")
         self.assertEqual(row["tokens"]["lead"]["calls"], 1)
         self.assertEqual(sorted(str(path) for path in self.root.rglob("*")), before)
         self.assertFalse(self.data.exists())
@@ -403,20 +403,28 @@ class ContractTests(unittest.TestCase):
 
     def test_status_open_scope_filter_and_action_length(self):
         self.write(self.data / "candidates.md", "".join([
-            candidate("C1", scope="core"), candidate("C2", scope="personal"),
-            candidate("C3", scope="project:COS", action="x" * 120),
-            candidate("C4", scope="project:OTHER"), candidate("C5", scope="adapter:codex"),
-            candidate("C6", scope="recipe:media"), candidate("C7", status="retired")]))
-        output = self.ok("status", "--open")
-        self.assertEqual([line.split(" · ")[0] for line in output.splitlines()], ["C1", "C2", "C3"])
-        self.assertEqual(len(output.splitlines()[2].split(" · ")[-1]), 90)
-        self.assertIn("C4 ·", self.ok("status", "--open", "--project", "OTHER"))
-        self.assertNotIn("C3 ·", self.ok("status", "--open", "--project", "OTHER"))
+            candidate("C5", scope="adapter:codex"), candidate("C1", scope="core"),
+            candidate("C6", scope="recipe:media", status="trial", action="y" * 120),
+            candidate("C2", scope="personal"), candidate("C3", scope="project:COS", action="x" * 120),
+            candidate("C4", scope="project:OTHER"), candidate("C7", status="retired"),
+            candidate("C8", scope="recipe:media", status="rule")]))
+        lines = self.ok("status", "--open").splitlines()
+        self.assertEqual([line.split(" · ")[0] for line in lines], ["C1", "C2", "C3", "C5", "C6"])
+        self.assertEqual(len(lines[2].split(" · ")[-1]), 90)
+        self.assertEqual(lines[3].split(" · ")[-1], "[adapter:codex] run verification")
+        self.assertEqual(lines[4].split(" · ")[-1], "[recipe:media] " + "y" * 90)
+        self.assertEqual(self.status()["open"], 5)
+        other = self.ok("status", "--open", "--project", "OTHER").splitlines()
+        self.assertEqual([line.split(" · ")[0] for line in other], ["C1", "C2", "C4", "C5", "C6"])
+        self.assertEqual(self.status("--project", "OTHER")["open"], 5)
+        self.assertIn("open=5", self.ok("status", "--project", "OTHER"))
 
     def test_status_output_limits_and_ready_overflow(self):
         self.write(self.data / "candidates.md", "".join(candidate("C" + str(n), effects=["yes"])
                                                        for n in range(1, 26)))
-        self.assertEqual(len(self.ok("status", "--open").splitlines()), 20)
+        lines = self.ok("status", "--open").splitlines()
+        self.assertEqual([line.split(" · ")[0] for line in lines], ["C" + str(n) for n in range(1, 26)])
+        self.assertEqual(self.status()["open"], 25)
         output = self.ok("status")
         self.assertLessEqual(len(output.splitlines()), 8)
         self.assertIn("+20", output)
@@ -440,7 +448,7 @@ class ContractTests(unittest.TestCase):
         lines = output.splitlines()
         self.assertLessEqual(len(lines), 5)
         self.assertTrue(all(len(line) <= 220 for line in lines))
-        self.assertIn("lean-team 2.2.0", lines[0])
+        self.assertIn("lean-team 2.2.1", lines[0])
         self.assertIn("load the lean-team skill first", lines[0])
         self.assertTrue(lines[1].startswith('Tool: bash "') and lines[1].endswith('lt.sh" status | tokens | log'))
         self.assertIn(self.project.as_posix() + "/.claude/lean-team.md (2 lines)", output)
@@ -611,11 +619,11 @@ class ContractTests(unittest.TestCase):
             self.cli("tokens", "--debug")
 
     def test_version_matches_plugin_manifest(self):
-        self.assertEqual(lt.VERSION, "2.2.0")
+        self.assertEqual(lt.VERSION, "2.2.1")
         manifest = SCRIPT_DIR.parents[2] / ".claude-plugin/plugin.json"
         if manifest.exists():
             self.assertEqual(lt.VERSION, json.loads(manifest.read_text(encoding="utf-8"))["version"],
-                             "lead-owned plugin.json must be updated to the contract's 2.2.0")
+                             "lead-owned plugin.json must be updated to the contract's 2.2.1")
 
 
 if __name__ == "__main__":
