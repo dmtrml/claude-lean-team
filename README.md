@@ -13,7 +13,7 @@ A skill and two subagent profiles that turn Claude Code into a team: the expensi
 | `skills/lean-team/recipes/` | Stack and platform specifics, read only when they apply: `web-js.md`, `windows.md` |
 | `skills/lean-team/templates/` | Retro questions, candidate-rule format, metrics line format |
 | `skills/lean-team/scripts/` | `lt.sh` / `lt.py` (Python 3.8+, stdlib only): token counts from the session log, the metrics line, the learning status; `test_lt.py` is its test suite |
-| `hooks/hooks.json` | Plugin hooks: a short reminder at session start and a one-line hint when you ask to save tokens |
+| `hooks/hooks.json` | Plugin hooks: a short reminder at session start, a one-line hint when you ask to save tokens, a context warning at 180k and 240k, a stop on Bash heredocs of 40+ lines, a silent per-session journal (`lt.sh report`) |
 | `agents/lean-builder.md`, `agents/lean-worker.md` | Claude fallback tiers: builder on **Sonnet** (writes and self-verifies code), worker on **Haiku** (research, downloads, content, config, mechanical moves) |
 | `docs/evidence.md` | Measurements behind the rules and the open candidate rules |
 

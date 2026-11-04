@@ -27,7 +27,7 @@ fi
 # No Python: hooks still remind, everything else reports the problem.
 case "$1" in
   start) echo "lean-team is installed. For multi-step work load the lean-team skill first; do small fixes yourself. (Python 3.8+ not found: token counts and learning status are unavailable.)" ;;
-  prompt) cat >/dev/null ;;
+  prompt|guard|journal) cat >/dev/null ;;
   *) echo "lean-team: Python 3.8+ not found (tried python3, python, py)" >&2; exit 3 ;;
 esac
 exit 0

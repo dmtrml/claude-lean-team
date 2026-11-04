@@ -283,7 +283,7 @@ class ContractTests(unittest.TestCase):
         before = sorted(str(path) for path in self.root.rglob("*"))
         row = json.loads(self.ok(*self.log_args("--dry-run")))
         self.assertEqual(list(row), METRIC_KEYS)
-        self.assertEqual(row["skill_version"], "2.2.1")
+        self.assertEqual(row["skill_version"], "2.3.0")
         self.assertEqual(row["tokens"]["lead"]["calls"], 1)
         self.assertEqual(sorted(str(path) for path in self.root.rglob("*")), before)
         self.assertFalse(self.data.exists())
@@ -448,7 +448,7 @@ class ContractTests(unittest.TestCase):
         lines = output.splitlines()
         self.assertLessEqual(len(lines), 5)
         self.assertTrue(all(len(line) <= 220 for line in lines))
-        self.assertIn("lean-team 2.2.1", lines[0])
+        self.assertIn("lean-team 2.3.0", lines[0])
         self.assertIn("load the lean-team skill first", lines[0])
         self.assertTrue(lines[1].startswith('Tool: bash "') and lines[1].endswith('lt.sh" status | tokens | log'))
         self.assertIn(self.project.as_posix() + "/.claude/lean-team.md (2 lines)", output)
@@ -478,6 +478,69 @@ class ContractTests(unittest.TestCase):
                              capture_output=True, env=env, timeout=20)
         self.assertEqual(run.returncode, 0)
         self.assertIn(b"load the lean-team skill", run.stdout)
+
+    def run_hook(self, command, payload, *extra):
+        env = dict(os.environ, LEAN_TEAM_HOME=str(self.data), LEAN_TEAM_PROJECTS_DIR=str(self.folder.parent))
+        return subprocess.run([sys.executable, str(SCRIPT_DIR / "lt.py"), command, *extra],
+                              input=json.dumps(payload).encode("utf-8"), capture_output=True, env=env, timeout=20)
+
+    def fake_log(self, ident, size):
+        path = self.folder / (ident + ".jsonl")
+        self.rows([
+            dict(type="assistant", timestamp="2026-11-04T10:00:00Z", message=dict(
+                id="a", model="m", content=[], usage=dict(input_tokens=1, cache_read_input_tokens=size))),
+            dict(type="assistant", isSidechain=True, timestamp="2026-11-04T10:00:01Z", message=dict(
+                id="b", model="m", content=[], usage=dict(input_tokens=1, cache_read_input_tokens=999999))),
+        ], path)
+        return path
+
+    def test_context_warning_once_per_threshold(self):
+        path = self.fake_log("ctx-session", 100000)
+        payload = dict(session_id="ctx-session", transcript_path=str(path), prompt="next")
+        self.assertEqual(self.run_hook("prompt", payload).stdout, b"")
+        path = self.fake_log("ctx-session", 200000)
+        self.assertIn(b"context is 200k", self.run_hook("prompt", payload).stdout)
+        self.assertEqual(self.run_hook("prompt", payload).stdout, b"")
+        path = self.fake_log("ctx-session", 250000)
+        self.assertIn(b"context is 250k", self.run_hook("prompt", payload).stdout)
+        self.assertEqual(self.run_hook("prompt", payload).stdout, b"")
+
+    def test_context_warning_off_and_missing_transcript_are_silent(self):
+        missing = dict(session_id="ctx-gone", transcript_path=str(self.folder / "nope.jsonl"), prompt="x")
+        run = self.run_hook("prompt", missing)
+        self.assertEqual((run.returncode, run.stdout), (0, b""))
+        path = self.fake_log("ctx-off", 200000)
+        self.data.mkdir(parents=True, exist_ok=True)
+        (self.data / "config.json").write_text('{"auto": "off"}', encoding="utf-8")
+        run = self.run_hook("prompt", dict(session_id="ctx-off", transcript_path=str(path), prompt="x"))
+        self.assertEqual((run.returncode, run.stdout), (0, b""))
+
+    def test_guard_blocks_only_long_heredocs(self):
+        def decide(command, tool="Bash"):
+            out = self.run_hook("guard", dict(tool_name=tool, tool_input=dict(command=command))).stdout
+            return json.loads(out)["hookSpecificOutput"]["permissionDecision"] if out else None
+        body = "\n".join("line" for _ in range(45))
+        self.assertEqual(decide("cat > a.py <<'EOF'\n" + body + "\nEOF"), "deny")
+        self.assertEqual(decide("python - <<-EOF\n" + body + "\nEOF"), "deny")
+        self.assertIsNone(decide("cat > a.py <<'EOF'\nshort\nEOF"))
+        self.assertIsNone(decide("echo start\n" + body))
+        self.assertIsNone(decide("grep x <<<word\n" + body))
+        self.assertIsNone(decide("cat <<'EOF'\n" + body + "\nEOF", tool="PowerShell"))
+        self.assertEqual(self.run_hook("guard", dict(tool_name="Bash")).returncode, 0)
+
+    def test_journal_keeps_one_row_and_report_prints_it(self):
+        path = self.fake_log("journal-session", 200000)
+        payload = dict(session_id="journal-session", transcript_path=str(path), cwd="/x/video4")
+        for _ in range(2):
+            run = self.run_hook("journal", payload)
+            self.assertEqual((run.returncode, run.stdout), (0, b""))
+        self.assertEqual(len(list((self.data / "sessions").glob("*.journal.json"))), 1)
+        row = json.loads((self.data / "sessions" / "journal-session.journal.json").read_text(encoding="utf-8"))
+        self.assertEqual(row["peak"], 200001)
+        self.assertEqual(row["project"], "video4")
+        out = self.run_hook("report", {}).stdout.decode("utf-8")
+        self.assertIn("journal-", out)
+        self.assertIn("video4", out)
 
     def previous(self, ident="previous-session-456", tool=True):
         path = self.folder / (ident + ".jsonl")
@@ -619,11 +682,11 @@ class ContractTests(unittest.TestCase):
             self.cli("tokens", "--debug")
 
     def test_version_matches_plugin_manifest(self):
-        self.assertEqual(lt.VERSION, "2.2.1")
+        self.assertEqual(lt.VERSION, "2.3.0")
         manifest = SCRIPT_DIR.parents[2] / ".claude-plugin/plugin.json"
         if manifest.exists():
             self.assertEqual(lt.VERSION, json.loads(manifest.read_text(encoding="utf-8"))["version"],
-                             "lead-owned plugin.json must be updated to the contract's 2.2.1")
+                             "lead-owned plugin.json must be updated to the contract's 2.3.0")
 
 
 if __name__ == "__main__":
