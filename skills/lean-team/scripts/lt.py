@@ -13,8 +13,13 @@ import subprocess
 import sys
 
 
-VERSION = "2.2.1"
+VERSION = "2.3.0"
 MAX_TRANSCRIPT = 50 * 1024 * 1024
+# Measured on 24 sessions: restarting at 120k loses tokens, 150-220k saves about the same.
+CONTEXT_WARN = (180000, 240000)
+CONTEXT_TAIL = 1024 * 1024
+HEREDOC_LINES = 40
+HEREDOC_RE = re.compile(r"(?<!<)<<-?\s*['\"]?[A-Za-z_]")
 KINDS = ("build", "fix", "review", "research", "content", "media", "plan", "ops")
 CAUSES = ("brief-ambiguous", "design-not-decided", "ownership-too-narrow",
           "brief-contradictory", "scope-grew-in-review", "executor-weak",
@@ -615,10 +620,112 @@ def start_command(args):
     print("\n".join(lines[:5]))
 
 
+def usage_context(usage):
+    return sum(number(usage.get(key)) for key in (
+        "input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
+
+
+def last_context(path):
+    """Context size of the last lead call, from the tail of the transcript only."""
+    with open(path, "rb") as handle:
+        handle.seek(0, os.SEEK_END)
+        handle.seek(max(0, handle.tell() - CONTEXT_TAIL))
+        lines = handle.read().splitlines()
+    for raw in reversed(lines):
+        try:
+            row = json.loads(raw.decode("utf-8", "replace"))
+        except ValueError:
+            continue
+        message = row.get("message") if isinstance(row, dict) else None
+        if (row.get("type") == "assistant" if isinstance(row, dict) else False) \
+                and not row.get("isSidechain") and isinstance(message, dict) \
+                and isinstance(message.get("usage"), dict) and message.get("model") != "<synthetic>":
+            return usage_context(message["usage"])
+    return 0
+
+
+def context_warning(session, hook):
+    """Agents cannot see their own context size; say it once per threshold."""
+    transcript = hook.get("transcript_path")
+    if not valid_session(session) or not isinstance(transcript, str):
+        return
+    try:
+        size = last_context(transcript)
+    except OSError:
+        return
+    for threshold in reversed(CONTEXT_WARN):
+        seen = marker(session, ".ctx{}".format(threshold))
+        if size >= threshold:
+            if not seen.exists():
+                touch(seen)
+                print("lean-team: context is {}k and every call re-reads it. If this message starts "
+                      "a new phase, propose a fresh session with a short brief (it should re-read under "
+                      "15k), or give a big rewrite to a fresh builder. In a live iteration, finish it "
+                      "first.".format(round(size / 1000)))
+            return
+
+
+def guard_command(args):
+    """PreToolUse: a long heredoc fails on quoting and is then paid for twice."""
+    hook, valid = hook_input()
+    if not valid or config_value() == "off" or hook.get("tool_name") != "Bash":
+        return
+    tool_input = hook.get("tool_input")
+    command = tool_input.get("command") if isinstance(tool_input, dict) else None
+    if not isinstance(command, str) or not HEREDOC_RE.search(command):
+        return
+    lines = command.count("\n") + 1
+    if lines >= HEREDOC_LINES:
+        print(json.dumps(dict(hookSpecificOutput=dict(
+            hookEventName="PreToolUse", permissionDecision="deny",
+            permissionDecisionReason="lean-team: this heredoc is {} lines. Write the script to a file "
+            "with the Write tool and run the file.".format(lines)))))
+
+
+def journal_command(args):
+    """Stop hook: keep one silent row per session, so the report needs no agent."""
+    hook, valid = hook_input()
+    session = session_id(args, hook)
+    transcript = hook.get("transcript_path")
+    path = marker(session, ".journal.json")
+    if not valid or path is None or not isinstance(transcript, str) or config_value() == "off":
+        return
+    groups, _ = measure(session)
+    peak = 0
+    for row in json_lines(Path(transcript)):
+        message = row.get("message")
+        if row.get("type") == "assistant" and not row.get("isSidechain") \
+                and isinstance(message, dict) and isinstance(message.get("usage"), dict):
+            peak = max(peak, usage_context(message["usage"]))
+    lead, subagents = groups["lead"], groups["subagents"]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_object(path, dict(
+        session=session, project=Path(str(hook.get("cwd") or ".")).name,
+        at=dt.datetime.now().strftime("%Y-%m-%d %H:%M"), calls=lead["calls"], peak=peak,
+        lead=lead["effective"], subagents=subagents["effective"], images=lead["images"]))
+
+
+def report_command(args):
+    rows = []
+    for path in (data_dir() / "sessions").glob("*.journal.json"):
+        row = read_object(path)
+        if row.get("at"):
+            rows.append(row)
+    rows.sort(key=lambda row: row["at"], reverse=True)
+    if not rows:
+        print("No journal rows yet.")
+    for row in rows[:max(1, args.last)]:
+        print("{} {} {:>4} calls  peak {:>6}  lead {:>6}  sub {:>6}  img {:>3}  {}".format(
+            row["at"], row["session"][:8], row.get("calls", 0), compact(row.get("peak", 0)),
+            compact(row.get("lead", 0)), compact(row.get("subagents", 0)),
+            row.get("images", 0), row.get("project", "")))
+
+
 def prompt_command(args):
     hook, valid = hook_input()
     if not valid or config_value() == "off":
         return
+    context_warning(session_id(args, hook), hook)
     prompt = hook.get("prompt")
     hinted = marker(session_id(args, hook), ".hinted")
     if not isinstance(prompt, str) or hinted is None:
@@ -635,10 +742,13 @@ def parser():
     root = Parser(description=__doc__)
     root.add_argument("--debug", action="store_true")
     commands = root.add_subparsers(dest="command", required=True)
-    for name in ("start", "prompt", "tokens", "log", "status", "consolidated", "config"):
+    for name in ("start", "prompt", "guard", "journal", "report", "tokens", "log", "status",
+                 "consolidated", "config"):
         command = commands.add_parser(name)
         command.add_argument("--debug", action="store_true", default=argparse.SUPPRESS)
-        if name in ("start", "prompt", "tokens", "log"):
+        if name == "report":
+            command.add_argument("--last", type=int, default=15)
+        if name in ("start", "prompt", "journal", "tokens", "log"):
             command.add_argument("--session")
         if name in ("start", "prompt", "log", "status"):
             command.add_argument("--project-dir")
@@ -670,18 +780,21 @@ def main(argv=None):
     args = None
     try:
         args = parser().parse_args(argv)
-        if args.command in ("start", "prompt"):
+        if args.command in ("start", "prompt", "guard", "journal"):
             # Buffer output so exceptions cannot leave partial hook instructions.
             output = io.StringIO()
             original = sys.stdout
             try:
                 sys.stdout = output
-                (start_command if args.command == "start" else prompt_command)(args)
+                dict(start=start_command, prompt=prompt_command, guard=guard_command,
+                     journal=journal_command)[args.command](args)
             except Exception:
                 return 0
             finally:
                 sys.stdout = original
             print(output.getvalue(), end="")
+        elif args.command == "report":
+            report_command(args)
         elif args.command == "tokens":
             tokens_command(args)
         elif args.command == "log":
